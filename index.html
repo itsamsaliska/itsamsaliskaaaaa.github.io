@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Скейтинг система — расчёт мест</title>
+  <style>
+    :root {
+      --bg-1: #e9f7ef;
+      --bg-2: #dff1ff;
+      --card: rgba(255, 255, 255, 0.9);
+      --text: #123026;
+      --muted: #5c746b;
+      --green: #24a35a;
+      --green-dark: #168044;
+      --green-soft: #e9f9ef;
+      --blue: #2563eb;
+      --orange: #f59e0b;
+      --border: rgba(31, 88, 63, 0.14);
+      --shadow: 0 24px 70px rgba(18, 48, 38, 0.16);
+      --radius-xl: 34px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at 10% 10%, rgba(36, 163, 90, .22), transparent 30%),
+        radial-gradient(circle at 90% 0%, rgba(37, 99, 235, .16), transparent 32%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.15));
+    }
+
+    button, input { font: inherit; }
+
+    .screen {
+      min-height: 100vh;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    .screen.active { display: flex; }
+
+    .setup-card, .platform-card {
+      width: min(980px, 100%);
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: clamp(24px, 5vw, 56px);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--green-dark);
+      background: var(--green-soft);
+      border: 1px solid rgba(36, 163, 90, .18);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.3rem);
+      line-height: .95;
+      letter-spacing: -.05em;
+      color: #102c22;
+    }
+
+    .hero-subtitle {
+      margin: 18px 0 30px;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+      line-height: 1.55;
+      max-width: 720px;
+    }
+
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 26px 0;
+    }
+
+    .setup-field {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(18,48,38,.06);
+    }
+
+    .setup-field label {
+      display: block;
+      color: #31594a;
+      font-weight: 900;
+      font-size: .95rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 12px;
+    }
+
+    .setup-field input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: #f4faf6;
+      color: var(--text);
+      border-radius: 20px;
+      padding: 18px 16px;
+      font-weight: 900;
+      font-size: 2rem;
+      text-align: center;
+    }
+
+    .setup-field input:focus {
+      box-shadow: 0 0 0 3px rgba(36, 163, 90, .22);
+      background: #fff;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 22px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 15px 24px;
+      background: var(--green);
+      color: white;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(36, 163, 90, .25);
+      transition: transform .12s, background .12s, box-shadow .12s;
+    }
+
+    .btn:hover {
+      background: var(--green-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 16px 28px rgba(36, 163, 90, .28);
+    }
+
+    .btn:active { transform: translateY(0) scale(.98); }
+
+    .btn.secondary {
+      background: #eef7f2;
+      color: #1e6240;
+      box-shadow: none;
+      border: 1px solid var(--border);
+    }
+
+    .btn.secondary:hover { background: #e2f2e9; }
+
+    .hint {
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.45;
+    }
+
+    .error-box {
+      display: none;
+      color: #9b1c1c;
+      background: #fff1f1;
+      border: 1px solid #ffc9c9;
+      border-radius: 18px;
+      padding: 12px 14px;
+      font-weight: 800;
+      margin-top: 16px;
+    }
+
+    .error-box.show { display: block; }
+
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .platform-option {
+      min-height: 210px;
+      text-align: left;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      padding: 22px;
+      cursor: pointer;
+      transition: transform .14s, border-color .14s, box-shadow .14s;
+      box-shadow: 0 12px 30px rgba(18,48,38,.07);
+    }
+
+    .platform-option:hover {
+      transform: translateY(-4px);
+      border-color: rgba(36, 163, 90, .45);
+      box-shadow: 0 18px 42px rgba(18,48,38,.12);
+    }
+
+    .platform-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-size: 1.8rem;
+      margin-bottom: 18px;
+      background: var(--green-soft);
+    }
+
+    .platform-option:nth-child(1) .platform-icon { background: #eef4ff; }
+    .platform-option:nth-child(2) .platform-icon { background: #fff6df; }
+
+    .platform-title {
+      font-size: 1.2rem;
+      font-weight: 950;
+      margin-bottom: 8px;
+      color: #14382b;
+    }
+
+    .platform-text {
+      color: var(--muted);
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 18px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #f3f7f5;
+      color: #557166;
+      font-size: .82rem;
+      font-weight: 800;
+    }
+
+    .app-shell {
+      width: min(1500px, 100%);
+      align-self: flex-start;
+    }
+
+    #calculatorScreen {
+      align-items: flex-start;
+      padding: 22px;
+    }
+
+    .app-card {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.76);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      padding: clamp(16px, 3vw, 28px);
+      backdrop-filter: blur(18px);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #123026;
+      font-size: clamp(1.8rem, 3vw, 3rem);
+      letter-spacing: -.04em;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f2faf5;
+      border: 1px solid var(--border);
+      color: #265c43;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 850;
+      font-size: .9rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .dance-tab {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .dance-btn {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: #1c5a36;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: .12s;
+      user-select: none;
+      box-shadow: 0 6px 14px rgba(18,48,38,.05);
+    }
+
+    .dance-btn.active {
+      background: var(--green);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 10px 22px rgba(36,163,90,.24);
+    }
+
+    .dance-btn:hover { transform: translateY(-1px); }
+
+    .work-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(340px, .7fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: 0 12px 30px rgba(18,48,38,.06);
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 20px;
+      border: 1px solid #d7eadf;
+      background: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      background: white;
+      min-width: 520px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #eff8f3;
+      color: #1c603a;
+      padding: 14px 8px;
+      font-weight: 950;
+      border-bottom: 2px solid #bcddca;
+      border-right: 1px solid #d2e9db;
+      text-align: center;
+    }
+
+    td {
+      border: 1px solid #d8ecdf;
+      padding: 8px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .couple-label {
+      background: #f4faf6;
+      font-weight: 950;
+      white-space: nowrap;
+      color: #174632;
+    }
+
+    .judge-input {
+      width: 70px;
+      background: white;
+      border: 1px solid #c2dfce;
+      padding: 10px 4px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 800;
+      border-radius: 40px;
+      transition: .08s linear;
+    }
+
+    .judge-input:focus {
+      background: #fafff7;
+      border-color: var(--green);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(36,163,90,.18);
+    }
+
+    .judge-input.invalid {
+      border-color: #e07c4c;
+      background: #fff2e6;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-bottom: 12px;
+      font-weight: 900;
+      color: #b00020;
+      text-align: center;
+    }
+
+    .status.error {
+      background: #fff0f0;
+      border: 1px solid #f0b8b8;
+      border-radius: 18px;
+      padding: 8px 12px;
+    }
+
+    .final-results {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 30px rgba(18,48,38,.06);
+    }
+
+    .final-title {
+      font-weight: 950;
+      font-size: 1.2rem;
+      color: #153c2d;
+      margin-bottom: 12px;
+    }
+
+    .final-column {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .final-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid #d4ecdd;
+    }
+
+    .final-place-num {
+      font-weight: 950;
+      min-width: 74px;
+      color: #14552e;
+    }
+
+    .calculation-details {
+      margin-top: 18px;
+      overflow-x: auto;
+    }
+
+    .calculation-details table {
+      min-width: 720px;
+      background: #f5f8f6;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+    }
+
+    .calculation-details th {
+      position: static;
+      background: #e6e8eb;
+      color: #162838;
+      font-weight: 950;
+    }
+
+    .calculation-details td,
+    .calculation-details th {
+      border: 2px solid #cfd5d8;
+      padding: 10px 12px;
+      text-align: center;
+      font-size: .95rem;
+    }
+
+    .calculation-details .dance-calc-title {
+      font-weight: 950;
+      font-size: 1.28rem;
+      color: #1b5c43;
+      margin: 22px 0 12px;
+    }
+
+    .calculation-details .majority-note {
+      color: #162838;
+      font-size: .95rem;
+      margin: 4px 0 18px;
+    }
+
+    .calculation-details .final-place-cell {
+      font-weight: 950;
+      color: #162838;
+    }
+
+    .notice {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #fff8e8;
+      border: 1px solid #f5d48a;
+      color: #7a4a00;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .notice.show { display: block; }
+
+
+    .console-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .console-panel {
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(170, 215, 188, .9);
+      border-radius: 28px;
+      padding: 18px;
+      box-shadow: 0 18px 42px rgba(22, 78, 48, .12);
+      min-height: 0;
+    }
+
+    .console-title {
+      margin: 0 0 8px;
+      color: #14552e;
+      font-size: 1.15rem;
+      font-weight: 950;
+    }
+
+    .console-help {
+      margin: 0 0 14px;
+      color: #486555;
+      line-height: 1.45;
+      font-weight: 650;
+    }
+
+    .code-window, .console-output {
+      background: #101b14;
+      color: #d9fbe5;
+      border-radius: 22px;
+      padding: 16px;
+      overflow: auto;
+      font-family: Consolas, Monaco, 'Courier New', monospace;
+      font-size: .9rem;
+      line-height: 1.45;
+      white-space: pre;
+      max-height: 520px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .console-input {
+      width: 100%;
+      min-height: 360px;
+      resize: vertical;
+      border: 1px solid #b8dcc7;
+      border-radius: 22px;
+      padding: 16px;
+      outline: none;
+      background: #0f1b13;
+      color: #e9fff0;
+      font-family: Consolas, Monaco, 'Courier New', monospace;
+      font-size: 1rem;
+      line-height: 1.5;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+
+    .console-input:focus {
+      border-color: #2a9d52;
+      box-shadow: 0 0 0 4px rgba(42,157,82,.16), inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+
+    .console-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .console-output {
+      min-height: 220px;
+      background: #f6fff8;
+      color: #153b27;
+      border: 1px solid #c9e6d3;
+      max-height: none;
+    }
+
+    .console-output.error {
+      background: #fff3f0;
+      color: #8a1f11;
+      border-color: #f0b9ac;
+    }
+
+    @media (max-width: 980px) {
+      .setup-grid, .platform-grid, .work-grid, .console-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        flex-direction: column;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .screen, #calculatorScreen { padding: 12px; }
+      .setup-card, .platform-card, .app-card { border-radius: 24px; padding: 18px; }
+      .hero-title { font-size: 2.15rem; }
+      .setup-field input { font-size: 1.7rem; }
+      .btn { width: 100%; }
+      .platform-option { min-height: 0; }
+      .judge-input { width: 56px; }
+    }
+  </style>
+</head>
+<body>
+  <section id="setupScreen" class="screen active">
+    <div class="setup-card">
+      <div class="eyebrow">🏆 Скейтинг система</div>
+      <h1 class="hero-title">Настройте соревнование</h1>
+      <p class="hero-subtitle">
+        Сначала укажите, сколько будет танцев, судей и пар. После этого выберите удобный способ расчёта мест.
+      </p>
+
+      <div class="setup-grid">
+        <div class="setup-field">
+          <label for="setupDances">Танцев</label>
+          <input id="setupDances" type="number" min="1" value="1" inputmode="numeric" />
+        </div>
+        <div class="setup-field">
+          <label for="setupJudges">Судей</label>
+          <input id="setupJudges" type="number" min="1" value="5" inputmode="numeric" />
+        </div>
+        <div class="setup-field">
+          <label for="setupCouples">Пар</label>
+          <input id="setupCouples" type="number" min="1" value="6" inputmode="numeric" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="goToPlatformChoice()">Продолжить</button>
+        <span class="hint">Поля можно будет изменить, вернувшись на этот экран.</span>
+      </div>
+
+      <div id="setupError" class="error-box"></div>
+    </div>
+  </section>
+
+  <section id="platformScreen" class="screen">
+    <div class="platform-card">
+      <div class="eyebrow">⚙️ Выбор платформы</div>
+      <h1 class="hero-title">Где считать места?</h1>
+      <p class="hero-subtitle">
+        Выберите удобный формат. Python-режим теперь запускается прямо на сайте без скачивания и установки, Excel создаёт готовую книгу, а обычный сайт-расчёт работает как раньше.
+      </p>
+
+      <div class="platform-grid">
+        <button class="platform-option" onclick="startPythonProgram()">
+          <div class="platform-icon">🐍</div>
+          <div class="platform-title">Python-режим на сайте</div>
+          <p class="platform-text">Открыть консольное окно прямо на сайте: код видно, данные вводятся вручную строками, как в PyCharm.</p>
+          <span class="badge">Окно с кодом</span>
+        </button>
+
+        <button class="platform-option" onclick="startExcelTemplate()">
+          <div class="platform-icon">📊</div>
+          <div class="platform-title">Excel</div>
+          <p class="platform-text">Скачать готовую Excel-таблицу под указанное число танцев, судей и пар.</p>
+          <span class="badge">Готово: .xls с формулами</span>
+        </button>
+
+        <button class="platform-option" onclick="startSiteCalculator()">
+          <div class="platform-icon">🌐</div>
+          <div class="platform-title">Остаться на сайте</div>
+          <p class="platform-text">Открыть текущую форму ввода оценок и расчёт мест по правилам 5–11.</p>
+          <span class="badge">Готово к работе</span>
+        </button>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary" onclick="showScreen('setupScreen')">← Назад к настройкам</button>
+      </div>
+
+      <div id="platformNotice" class="notice"></div>
+    </div>
+  </section>
+
+
+  <section id="consoleScreen" class="screen">
+    <div class="app-shell">
+      <div class="app-card">
+        <div class="topbar">
+          <div>
+            <h1>Python-режим на сайте</h1>
+            <div class="meta-row">
+              <span class="pill">💃 Танцев: <strong id="consoleMetaDances">1</strong></span>
+              <span class="pill">⚖️ Судей: <strong id="consoleMetaJudges">5</strong></span>
+              <span class="pill">👥 Пар: <strong id="consoleMetaCouples">6</strong></span>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button class="btn secondary" onclick="showScreen('platformScreen')">Сменить платформу</button>
+            <button class="btn secondary" onclick="showScreen('setupScreen')">Изменить настройки</button>
+            <button class="btn" onclick="runConsoleCalculation()">Рассчитать места</button>
+          </div>
+        </div>
+
+        <div class="console-layout">
+          <div class="console-panel">
+            <h2 class="console-title">Код расчёта</h2>
+            <pre id="pythonCodePreview" class="code-window"></pre>
+          </div>
+
+          <div class="console-panel">
+            <h2 class="console-title">Ввод данных строками</h2>
+            <p class="console-help">Вводите места после двоеточия через пробел.</p>
+            <textarea id="consoleInput" class="console-input" spellcheck="false"></textarea>
+            <div class="console-actions">
+              <button class="btn" onclick="runConsoleCalculation()">Рассчитать места</button>
+              <button class="btn secondary" onclick="fillConsoleExample()">Заполнить пример</button>
+              <button class="btn secondary" onclick="buildConsoleEmptyTemplate()">Очистить шаблон</button>
+            </div>
+            <pre id="consoleOutput" class="console-output">Введите места и нажмите «Рассчитать места».</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="calculatorScreen" class="screen">
+    <div class="app-shell">
+      <div class="app-card">
+        <div class="topbar">
+          <div>
+            <h1 id="calculatorTitle">Скейтинг система</h1>
+            <div id="modeCaption" class="mode-caption">Расчёт на сайте</div>
+            <div class="meta-row">
+              <span class="pill">💃 Танцев: <strong id="metaDances">1</strong></span>
+              <span class="pill">⚖️ Судей: <strong id="metaJudges">5</strong></span>
+              <span class="pill">👥 Пар: <strong id="metaCouples">6</strong></span>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button class="btn secondary" onclick="showScreen('platformScreen')">Сменить платформу</button>
+            <button class="btn secondary" onclick="showScreen('setupScreen')">Изменить настройки</button>
+            <button class="btn" onclick="calculateAndDisplayResults()">Рассчитать места</button>
+          </div>
+        </div>
+
+        <div id="infoStatus" class="status"></div>
+        <div id="danceTabs" class="dance-tab"></div>
+
+        <div class="work-grid">
+          <div class="panel">
+            <div id="tablesArea"></div>
+          </div>
+
+          <div class="final-results">
+            <div class="final-title">Итоговые места</div>
+            <div id="finalResults" class="final-column"></div>
+          </div>
+        </div>
+
+        <div id="calculationDetails" class="calculation-details"></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    let judges = 5;
+    let couples = 6;
+    let dances = 1;
+    let currentDance = 0;
+    let allData = [];
+    let inputElements = [];
+
+    const setupScreen = document.getElementById('setupScreen');
+    const platformScreen = document.getElementById('platformScreen');
+    const calculatorScreen = document.getElementById('calculatorScreen');
+    const setupError = document.getElementById('setupError');
+    const platformNotice = document.getElementById('platformNotice');
+
+    const infoStatus = document.getElementById('infoStatus');
+    const danceTabs = document.getElementById('danceTabs');
+    const tablesArea = document.getElementById('tablesArea');
+    const finalResults = document.getElementById('finalResults');
+    const calculationDetails = document.getElementById('calculationDetails');
+
+    const metaDances = document.getElementById('metaDances');
+    const metaJudges = document.getElementById('metaJudges');
+    const metaCouples = document.getElementById('metaCouples');
+    const calculatorTitle = document.getElementById('calculatorTitle');
+    const modeCaption = document.getElementById('modeCaption');
+
+    const consoleMetaDances = document.getElementById('consoleMetaDances');
+    const consoleMetaJudges = document.getElementById('consoleMetaJudges');
+    const consoleMetaCouples = document.getElementById('consoleMetaCouples');
+    const consoleInput = document.getElementById('consoleInput');
+    const consoleOutput = document.getElementById('consoleOutput');
+    const pythonCodePreview = document.getElementById('pythonCodePreview');
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function readSetupValue(id, name) {
+      const value = parseInt(document.getElementById(id).value, 10);
+      if (!Number.isFinite(value) || value < 1) {
+        throw new Error(`${name} должно быть числом от 1 и больше`);
+      }
+      return value;
+    }
+
+    function saveSetupValues() {
+      try {
+        dances = readSetupValue('setupDances', 'Количество танцев');
+        judges = readSetupValue('setupJudges', 'Количество судей');
+        couples = readSetupValue('setupCouples', 'Количество пар');
+
+        setupError.classList.remove('show');
+        setupError.innerText = '';
+        return true;
+      } catch (error) {
+        setupError.innerText = error.message;
+        setupError.classList.add('show');
+        return false;
+      }
+    }
+
+    function goToPlatformChoice() {
+      if (!saveSetupValues()) return;
+      platformNotice.classList.remove('show');
+      platformNotice.innerText = '';
+      showScreen('platformScreen');
+    }
+
+    function showComingSoon(platformName) {
+      platformNotice.innerText = `${platformName} пока оставлен как вариант выбора, но логика выгрузки/расчёта ещё не подключена. Для рабочего расчёта выберите «Остаться на сайте».`;
+      platformNotice.classList.add('show');
+    }
+
+
+    function xmlEscape(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    function xmlCell(value = '', type = 'String', styleId = '', formula = '') {
+      const styleAttr = styleId ? ` ss:StyleID="${styleId}"` : '';
+      const formulaAttr = formula ? ` ss:Formula="${xmlEscape(formula)}"` : '';
+      const safeValue = value === null || value === undefined ? '' : value;
+      return `<Cell${styleAttr}${formulaAttr}><Data ss:Type="${type}">${xmlEscape(safeValue)}</Data></Cell>`;
+    }
+
+    function xmlBlankCell(styleId = '') {
+      const styleAttr = styleId ? ` ss:StyleID="${styleId}"` : '';
+      return `<Cell${styleAttr}/>`;
+    }
+
+    function xmlRow(cells, height = '') {
+      const heightAttr = height ? ` ss:Height="${height}"` : '';
+      return `<Row${heightAttr}>${cells.join('')}</Row>`;
+    }
+
+    function sheetRef(name, row, colStart, colEnd = colStart) {
+      const safeName = String(name).replace(/'/g, "''");
+      return `'${safeName}'!R${row}C${colStart}:R${row}C${colEnd}`;
+    }
+
+    function buildNestedThresholdFormula(countColumns, neededMajority) {
+      // Первое большинство: первая колонка 1 / 1-2 / 1-3 ..., где набрано большинство.
+      let formula = String(couples);
+      for (let i = countColumns.length - 2; i >= 0; i--) {
+        const threshold = i + 1;
+        formula = `IF(RC${countColumns[i]}>=${neededMajority},${threshold},${formula})`;
+      }
+      return `=${formula}`;
+    }
+
+    function buildDanceKeyFormula(thresholdCol, helperPairs) {
+      // Ключ сортировки повторяет логику правил 5-8:
+      // раньше найдено большинство -> лучше; дальше больше голосов -> лучше; меньшая сумма -> лучше.
+      const parts = [`TEXT(RC${thresholdCol},"000")`];
+      for (const helper of helperPairs) {
+        parts.push(`TEXT(IF(RC${thresholdCol}<=${helper.threshold},${judges}-RC${helper.countCol},999),"000")`);
+        parts.push(`TEXT(IF(RC${thresholdCol}<=${helper.threshold},RC${helper.sumCol},99999),"00000")`);
+      }
+      return `=${parts.join('&')}`;
+    }
+
+    function buildRankFormula(keyCol, firstRow, lastRow) {
+      const keyRange = `R${firstRow}C${keyCol}:R${lastRow}C${keyCol}`;
+      return `=1+COUNTIF(${keyRange},"<"&RC${keyCol})+(COUNTIF(${keyRange},RC${keyCol})-1)/2`;
+    }
+
+
+    function buildDancePlaceFormula(thresholdCol, helperPairs, firstRow, lastRow) {
+      const thRange = `R${firstRow}C${thresholdCol}:R${lastRow}C${thresholdCol}`;
+
+      const betterTerms = [`--(${thRange}<RC${thresholdCol})`];
+
+      for (let i = 0; i < helperPairs.length; i++) {
+        const k = helperPairs[i].threshold;
+        const countRange = `R${firstRow}C${helperPairs[i].countCol}:R${lastRow}C${helperPairs[i].countCol}`;
+        const sumRange = `R${firstRow}C${helperPairs[i].sumCol}:R${lastRow}C${helperPairs[i].sumCol}`;
+
+        const prevEqualParts = [];
+        for (let h = 0; h < i; h++) {
+          const prevCountRange = `R${firstRow}C${helperPairs[h].countCol}:R${lastRow}C${helperPairs[h].countCol}`;
+          const prevSumRange = `R${firstRow}C${helperPairs[h].sumCol}:R${lastRow}C${helperPairs[h].sumCol}`;
+          prevEqualParts.push(`IF(RC${thresholdCol}<=${helperPairs[h].threshold},--(${prevCountRange}=RC${helperPairs[h].countCol})*--(${prevSumRange}=RC${helperPairs[h].sumCol}),1)`);
+        }
+
+        const prevEqual = prevEqualParts.length ? prevEqualParts.join('*') : '1';
+        const betterAtK = `--(RC${thresholdCol}<=${k})*${prevEqual}*(--(${countRange}>RC${helperPairs[i].countCol})+--(${countRange}=RC${helperPairs[i].countCol})*--(${sumRange}<RC${helperPairs[i].sumCol}))`;
+        betterTerms.push(`--(${thRange}=RC${thresholdCol})*${betterAtK}`);
+      }
+
+      const equalParts = [`--(${thRange}=RC${thresholdCol})`];
+      for (const helper of helperPairs) {
+        const countRange = `R${firstRow}C${helper.countCol}:R${lastRow}C${helper.countCol}`;
+        const sumRange = `R${firstRow}C${helper.sumCol}:R${lastRow}C${helper.sumCol}`;
+        equalParts.push(`IF(RC${thresholdCol}<=${helper.threshold},--(${countRange}=RC${helper.countCol})*--(${sumRange}=RC${helper.sumCol}),1)`);
+      }
+
+      return `=1+SUMPRODUCT(${betterTerms.join('+')})+(SUMPRODUCT(${equalParts.join('*')})-1)/2`;
+    }
+
+    function valueRangeFormula(judgeStartCol, judgeEndCol, threshold, includeBlanksAsLast) {
+      const rng = `RC${judgeStartCol}:RC${judgeEndCol}`;
+      const blankAdd = includeBlanksAsLast ? `+COUNTBLANK(${rng})` : '';
+      // Простая формула без массивов: Excel стабильно считает количество мест 1, 1-2, 1-3...
+      return `=COUNTIF(${rng},"<=${threshold}")${blankAdd}`;
+    }
+
+    function sumRangeFormula(judgeStartCol, judgeEndCol, threshold, includeBlanksAsLast) {
+      const rng = `RC${judgeStartCol}:RC${judgeEndCol}`;
+      const blankAdd = includeBlanksAsLast ? `+COUNTBLANK(${rng})*${couples}` : '';
+      // Сумма именно тех оценок, которые входят в текущую колонку скейтинга.
+      return `=SUMIF(${rng},"<=${threshold}",${rng})${blankAdd}`;
+    }
+
+    function buildWorksheet(name, rows, columnCount, hiddenColumns = []) {
+      const hiddenSet = new Set(hiddenColumns);
+      const columnXml = Array.from({ length: columnCount }, (_, idx) => {
+        const colNumber = idx + 1;
+        const width = idx === 0 ? 82 : idx < 20 ? 78 : 92;
+        const hiddenAttr = hiddenSet.has(colNumber) ? ' ss:Hidden="1"' : '';
+        return `<Column ss:Width="${width}"${hiddenAttr}/>`;
+      }).join('');
+
+      return `
+        <Worksheet ss:Name="${xmlEscape(name)}">
+          <Table>
+            ${columnXml}
+            ${rows.join('\n')}
+          </Table>
+        </Worksheet>`;
+    }
+
+    function buildDanceWorksheet(danceNumber) {
+      const sheetName = `Танец ${danceNumber}`;
+      const dataStartRow = 6;
+      const dataEndRow = dataStartRow + couples - 1;
+      const judgeStartCol = 2;
+      const judgeEndCol = judges + 1;
+      const placeCol = judges + 2;
+      const thresholdCol = judges + 3;
+      const keyCol = judges + 4;
+      const helperStartCol = judges + 5;
+      const neededMajority = Math.floor(judges / 2) + 1;
+
+      const helperPairs = [];
+      for (let k = 1; k <= couples; k++) {
+        helperPairs.push({
+          threshold: k,
+          countCol: helperStartCol + (k - 1) * 2,
+          sumCol: helperStartCol + (k - 1) * 2 + 1
+        });
+      }
+
+      const rows = [];
+      rows.push(xmlRow([xmlCell(`Танец ${danceNumber}. Ввод оценок судей`, 'String', 'Title')], 30));
+      rows.push(xmlRow([xmlBlankCell()], 10));
+      rows.push(xmlRow([
+        xmlCell('Судей', 'String', 'SubHeader'), xmlCell(judges, 'Number', 'SubHeader'),
+        xmlCell('Пар', 'String', 'SubHeader'), xmlCell(couples, 'Number', 'SubHeader'),
+        xmlCell('Большинство', 'String', 'SubHeader'), xmlCell(neededMajority, 'Number', 'SubHeader')
+      ], 22));
+      rows.push(xmlRow([xmlCell('', 'String')], 10));
+
+      const header = [xmlCell('Пара', 'String', 'Header')];
+      for (let j = 1; j <= judges; j++) header.push(xmlCell(`Судья ${j}`, 'String', 'Header'));
+      header.push(xmlCell('Место в танце', 'String', 'Header'));
+      header.push(xmlCell('Первое большинство', 'String', 'Header'));
+      header.push(xmlCell('Ключ сортировки', 'String', 'Header'));
+      for (let k = 1; k <= couples; k++) {
+        header.push(xmlCell(k === 1 ? 'Кол-во 1' : `Кол-во 1-${k}`, 'String', 'Header'));
+        header.push(xmlCell(k === 1 ? 'Сумма 1' : `Сумма 1-${k}`, 'String', 'Header'));
+      }
+      rows.push(xmlRow(header, 28));
+
+      for (let c = 1; c <= couples; c++) {
+        const excelRow = dataStartRow + c - 1;
+        const row = [xmlCell(`Пара ${c}`, 'String', 'Pair')];
+        for (let j = 1; j <= judges; j++) row.push(xmlBlankCell('Input'));
+
+        const countColumns = helperPairs.map(item => item.countCol);
+        row.push(xmlCell(0, 'Number', 'Result', buildDancePlaceFormula(thresholdCol, helperPairs, dataStartRow, dataEndRow)));
+        row.push(xmlCell(couples, 'Number', 'Calc', buildNestedThresholdFormula(countColumns, neededMajority)));
+        row.push(xmlCell('', 'String', 'Calc', buildDanceKeyFormula(thresholdCol, helperPairs)));
+
+        for (let k = 1; k <= couples; k++) {
+          row.push(xmlCell(0, 'Number', 'Calc', valueRangeFormula(judgeStartCol, judgeEndCol, k, k === couples)));
+          row.push(xmlCell(0, 'Number', 'Calc', sumRangeFormula(judgeStartCol, judgeEndCol, k, k === couples)));
+        }
+
+        rows.push(xmlRow(row, 24));
+      }
+
+      const columnCount = helperStartCol + couples * 2 - 1;
+      return { xml: buildWorksheet(sheetName, rows, columnCount, [keyCol]), placeCol, dataStartRow, dataEndRow, judgeStartCol, judgeEndCol };
+    }
+
+    function buildOverallKeyFormula(sumCol, rule10Pairs, rule11Pairs, totalJudgeCells, neededBigMajority) {
+      // Итог: сначала правило 9 — минимальная сумма мест.
+      // Затем правило 10 — коэффициенты эффективности по танцам.
+      // Затем правило 11 — большой скейтинг по всем судейским оценкам.
+      const parts = [`TEXT(RC${sumCol},"0000.00")`];
+
+      for (const helper of rule10Pairs) {
+        parts.push(`TEXT(${dances}-RC${helper.countCol},"000")`);
+        parts.push(`TEXT(RC${helper.sumCol},"0000.00")`);
+      }
+
+      for (const helper of rule11Pairs) {
+        parts.push(`TEXT(${totalJudgeCells}-RC${helper.countCol},"000")`);
+        parts.push(`TEXT(IF(RC${helper.countCol}>=${neededBigMajority},RC${helper.sumCol},99999),"00000")`);
+      }
+
+      return `=${parts.join('&')}`;
+    }
+
+    function buildOverallWorksheet(danceMeta) {
+      const dataStartRow = 6;
+      const dataEndRow = dataStartRow + couples - 1;
+      const danceStartCol = 2;
+      const danceEndCol = danceStartCol + dances - 1;
+      const sumCol = danceEndCol + 1;
+      const finalPlaceCol = sumCol + 1;
+      const keyCol = sumCol + 2;
+      const helperStartCol = sumCol + 3;
+      const totalJudgeCells = judges * dances;
+      const neededBigMajority = Math.floor(totalJudgeCells / 2) + 1;
+
+      const rule10Pairs = [];
+      for (let k = 1; k <= couples; k++) {
+        rule10Pairs.push({
+          threshold: k,
+          countCol: helperStartCol + (k - 1) * 2,
+          sumCol: helperStartCol + (k - 1) * 2 + 1
+        });
+      }
+      const rule11StartCol = helperStartCol + couples * 2;
+      const rule11Pairs = [];
+      for (let k = 1; k <= couples; k++) {
+        rule11Pairs.push({
+          threshold: k,
+          countCol: rule11StartCol + (k - 1) * 2,
+          sumCol: rule11StartCol + (k - 1) * 2 + 1
+        });
+      }
+
+      const rows = [];
+      rows.push(xmlRow([xmlCell('Итог по всем танцам', 'String', 'Title')], 30));
+      rows.push(xmlRow([xmlBlankCell()], 10));
+      rows.push(xmlRow([
+        xmlCell('Танцев', 'String', 'SubHeader'), xmlCell(dances, 'Number', 'SubHeader'),
+        xmlCell('Судей', 'String', 'SubHeader'), xmlCell(judges, 'Number', 'SubHeader'),
+        xmlCell('Пар', 'String', 'SubHeader'), xmlCell(couples, 'Number', 'SubHeader'),
+        xmlCell('Большое большинство', 'String', 'SubHeader'), xmlCell(neededBigMajority, 'Number', 'SubHeader')
+      ], 22));
+      rows.push(xmlRow([xmlCell('', 'String')], 10));
+
+      const header = [xmlCell('Пара', 'String', 'Header')];
+      for (let d = 1; d <= dances; d++) header.push(xmlCell(`Танец ${d}`, 'String', 'Header'));
+      header.push(xmlCell('Сумма мест', 'String', 'Header'));
+      header.push(xmlCell('Итоговое место', 'String', 'Header'));
+      header.push(xmlCell('Ключ сортировки', 'String', 'Header'));
+      for (let k = 1; k <= couples; k++) {
+        header.push(xmlCell(k === 1 ? 'Прав.10 кол-во 1' : `Прав.10 кол-во 1-${k}`, 'String', 'Header'));
+        header.push(xmlCell(k === 1 ? 'Прав.10 сумма 1' : `Прав.10 сумма 1-${k}`, 'String', 'Header'));
+      }
+      for (let k = 1; k <= couples; k++) {
+        header.push(xmlCell(k === 1 ? 'Прав.11 кол-во 1' : `Прав.11 кол-во 1-${k}`, 'String', 'Header'));
+        header.push(xmlCell(k === 1 ? 'Прав.11 сумма 1' : `Прав.11 сумма 1-${k}`, 'String', 'Header'));
+      }
+      rows.push(xmlRow(header, 28));
+
+      for (let c = 1; c <= couples; c++) {
+        const excelRow = dataStartRow + c - 1;
+        const row = [xmlCell(`Пара ${c}`, 'String', 'Pair')];
+
+        for (let d = 1; d <= dances; d++) {
+          row.push(xmlCell(0, 'Number', 'Calc', `='Танец ${d}'!R${excelRow}C${danceMeta.placeCol}`));
+        }
+
+        row.push(xmlCell(0, 'Number', 'Result', `=SUM(RC${danceStartCol}:RC${danceEndCol})`));
+        row.push(xmlCell(0, 'Number', 'Result', buildRankFormula(keyCol, dataStartRow, dataEndRow)));
+        row.push(xmlCell('', 'String', 'Calc', buildOverallKeyFormula(sumCol, rule10Pairs, rule11Pairs, totalJudgeCells, neededBigMajority)));
+
+        const dancePlacesRange = `RC${danceStartCol}:RC${danceEndCol}`;
+        for (let k = 1; k <= couples; k++) {
+          // Правило 10: половинчатые места учитываются в следующей большей колонке: 3,5 входит в 1-4, но не в 1-3.
+          row.push(xmlCell(0, 'Number', 'Calc', `=SUMPRODUCT(--(ROUNDUP(${dancePlacesRange},0)<=${k}))`));
+          row.push(xmlCell(0, 'Number', 'Calc', `=SUMPRODUCT(--(ROUNDUP(${dancePlacesRange},0)<=${k}),${dancePlacesRange})`));
+        }
+
+        for (let k = 1; k <= couples; k++) {
+          const countParts = [];
+          const sumParts = [];
+          for (let d = 1; d <= dances; d++) {
+            const rawRange = sheetRef(`Танец ${d}`, excelRow, 2, judges + 1);
+            const blankCountPart = k === couples ? `+COUNTBLANK(${rawRange})` : '';
+            const blankSumPart = k === couples ? `+COUNTBLANK(${rawRange})*${couples}` : '';
+            countParts.push(`COUNTIF(${rawRange},"<=${k}")${blankCountPart}`);
+            sumParts.push(`SUMIF(${rawRange},"<=${k}",${rawRange})${blankSumPart}`);
+          }
+          row.push(xmlCell(0, 'Number', 'Calc', `=${countParts.join('+')}`));
+          row.push(xmlCell(0, 'Number', 'Calc', `=${sumParts.join('+')}`));
+        }
+
+        rows.push(xmlRow(row, 24));
+      }
+
+      const columnCount = rule11StartCol + couples * 2 - 1;
+      return buildWorksheet('Итог', rows, columnCount, [keyCol]);
+    }
+
+    function buildExcelXml() {
+      const danceWorksheets = [];
+      let danceMeta = null;
+      for (let d = 1; d <= dances; d++) {
+        const built = buildDanceWorksheet(d);
+        danceMeta = built;
+        danceWorksheets.push(built.xml);
+      }
+
+      const overallWorksheet = buildOverallWorksheet(danceMeta);
+
+      return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Author>Skating System</Author>
+  <Title>Скейтинг система</Title>
+ </DocumentProperties>
+ <ExcelWorkbook xmlns="urn:schemas-microsoft-com:office:excel">
+  <WindowHeight>9000</WindowHeight>
+  <WindowWidth>14000</WindowWidth>
+  <ProtectStructure>False</ProtectStructure>
+  <ProtectWindows>False</ProtectWindows>
+ </ExcelWorkbook>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/><Interior/><NumberFormat/><Protection/></Style>
+  <Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="18" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#168044" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:Horizontal="Center"/></Style>
+  <Style ss:ID="Note"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#31594A"/><Interior ss:Color="#E9F9EF" ss:Pattern="Solid"/><Alignment ss:WrapText="1" ss:Vertical="Center"/></Style>
+  <Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#14382B"/><Interior ss:Color="#DFF2E7" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7D8C6"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/></Borders></Style>
+  <Style ss:ID="SubHeader"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#174632"/><Interior ss:Color="#F4FAF6" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/></Borders></Style>
+  <Style ss:ID="Input"><Interior ss:Color="#ECFDF3" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7D8C6"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7D8C6"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7D8C6"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B7D8C6"/></Borders></Style>
+  <Style ss:ID="Pair"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/><Interior ss:Color="#F4FAF6" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D7EADF"/></Borders></Style>
+  <Style ss:ID="Calc"><Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/></Borders></Style>
+  <Style ss:ID="Result"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#14552E"/><Interior ss:Color="#DCFCE7" ss:Pattern="Solid"/><NumberFormat ss:Format="0.00"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#86CDA2"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#86CDA2"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#86CDA2"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#86CDA2"/></Borders></Style>
+ </Styles>
+ ${danceWorksheets.join('\n')}
+ ${overallWorksheet}
+</Workbook>`;
+    }
+
+
+    const PYTHON_PROGRAM_CODE = `# -*- coding: utf-8 -*-
+"""
+Скейтинг система — простая программа для расчёта мест.
+Запуск: python skating_python_program.py
+Нужен только стандартный Python 3, без дополнительных библиотек.
+"""
+
+import math
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+
+def fmt_place(value):
+    if abs(value - int(value)) < 1e-9:
+        return str(int(value))
+    return str(round(value, 2)).replace('.', ',')
+
+
+def marks_less_or_equal(votes, threshold):
+    return [v for v in votes if v <= threshold]
+
+
+def get_dance_places(data, couples, judges):
+    # data[couple][judge]
+    couple_places = []
+    for c in range(couples):
+        row = []
+        for j in range(judges):
+            try:
+                p = int(data[c][j])
+            except Exception:
+                p = couples
+            p = max(1, min(couples, p))
+            row.append(p)
+        couple_places.append(row)
+
+    needed_majority = judges // 2 + 1
+    assigned = [False] * couples
+    result = [None] * couples
+    next_place = 1
+
+    def stats_for(idx, threshold):
+        marks = marks_less_or_equal(couple_places[idx], threshold)
+        return len(marks), sum(marks)
+
+    def compare_from_threshold(a_idx, b_idx, start_threshold):
+        for k in range(start_threshold, couples + 1):
+            ca, sa = stats_for(a_idx, k)
+            cb, sb = stats_for(b_idx, k)
+            if ca != cb:
+                return -1 if ca > cb else 1
+            if sa != sb:
+                return -1 if sa < sb else 1
+        return 0
+
+    def signature(idx, start_threshold):
+        return tuple(stats_for(idx, k) for k in range(start_threshold, couples + 1))
+
+    while next_place <= couples:
+        threshold = None
+        for k in range(1, couples + 1):
+            if any((not assigned[i]) and stats_for(i, k)[0] >= needed_majority for i in range(couples)):
+                threshold = k
+                break
+
+        if threshold is None:
+            remaining = [i for i in range(couples) if not assigned[i]]
+            avg_place = (next_place + (next_place + len(remaining) - 1)) / 2
+            for i in remaining:
+                result[i] = avg_place
+            break
+
+        candidates = [i for i in range(couples) if (not assigned[i]) and stats_for(i, threshold)[0] >= needed_majority]
+        candidates.sort(key=lambda i: tuple((-stats_for(i, k)[0], stats_for(i, k)[1]) for k in range(threshold, couples + 1)))
+
+        pos = 0
+        while pos < len(candidates):
+            group = [candidates[pos]]
+            sig = signature(candidates[pos], threshold)
+            q = pos + 1
+            while q < len(candidates) and signature(candidates[q], threshold) == sig:
+                group.append(candidates[q])
+                q += 1
+
+            if len(group) == 1:
+                result[group[0]] = next_place
+            else:
+                avg_place = (next_place + (next_place + len(group) - 1)) / 2
+                for item in group:
+                    result[item] = avg_place
+
+            for item in group:
+                assigned[item] = True
+            next_place += len(group)
+            pos = q
+
+    return result
+
+
+def compare_rule_10_11(a, b, dance_places, full_data, couples, judges, dances):
+    places_a = [dance_places[d][a] for d in range(dances)]
+    places_b = [dance_places[d][b] for d in range(dances)]
+
+    # Правило 10: сравнение результатов по танцам.
+    for k in range(1, couples + 1):
+        marks_a = [p for p in places_a if math.ceil(p) <= k]
+        marks_b = [p for p in places_b if math.ceil(p) <= k]
+        if len(marks_a) != len(marks_b):
+            return -1 if len(marks_a) > len(marks_b) else 1
+        if len(marks_a) > 0:
+            sa = sum(marks_a)
+            sb = sum(marks_b)
+            if abs(sa - sb) > 1e-9:
+                return -1 if sa < sb else 1
+
+    # Правило 11: большой скейтинг по всем оценкам всех судей во всех танцах.
+    total_cells = judges * dances
+    needed_big_majority = total_cells // 2 + 1
+    votes_a, votes_b = [], []
+    for d in range(dances):
+        for j in range(judges):
+            try:
+                pa = int(full_data[d][a][j])
+            except Exception:
+                pa = couples
+            try:
+                pb = int(full_data[d][b][j])
+            except Exception:
+                pb = couples
+            votes_a.append(max(1, min(couples, pa)))
+            votes_b.append(max(1, min(couples, pb)))
+
+    for k in range(1, couples + 1):
+        ma = [v for v in votes_a if v <= k]
+        mb = [v for v in votes_b if v <= k]
+        if len(ma) != len(mb):
+            return -1 if len(ma) > len(mb) else 1
+        if len(ma) >= needed_big_majority:
+            sa = sum(ma)
+            sb = sum(mb)
+            if sa != sb:
+                return -1 if sa < sb else 1
+
+    return 0
+
+
+def final_places(full_data, couples, judges, dances):
+    dance_places = [get_dance_places(full_data[d], couples, judges) for d in range(dances)]
+    total_sums = [sum(dance_places[d][c] for d in range(dances)) for c in range(couples)]
+
+    indices = list(range(couples))
+
+    def cmp(a, b):
+        if abs(total_sums[a] - total_sums[b]) > 1e-9:
+            return -1 if total_sums[a] < total_sums[b] else 1
+        return compare_rule_10_11(a, b, dance_places, full_data, couples, judges, dances)
+
+    # Простая сортировка через cmp, чтобы не подключать сторонние библиотеки.
+    from functools import cmp_to_key
+    indices.sort(key=cmp_to_key(cmp))
+
+    places = [0] * couples
+    current_rank = 1
+    for i, curr in enumerate(indices):
+        if i > 0:
+            prev = indices[i - 1]
+            same_sum = abs(total_sums[prev] - total_sums[curr]) < 1e-9
+            same_by_rules = same_sum and compare_rule_10_11(prev, curr, dance_places, full_data, couples, judges, dances) == 0
+            if same_by_rules:
+                places[curr] = places[prev]
+            else:
+                places[curr] = current_rank
+        else:
+            places[curr] = current_rank
+        current_rank += 1
+
+    return places, total_sums, dance_places
+
+
+class SkatingApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title('Скейтинг система — расчёт мест')
+        self.geometry('1100x720')
+        self.minsize(900, 600)
+        self.configure(bg='#eef7f1')
+
+        self.dances_var = tk.IntVar(value=1)
+        self.judges_var = tk.IntVar(value=5)
+        self.couples_var = tk.IntVar(value=6)
+        self.entries = []
+        self.result_text = None
+
+        self.build_start_screen()
+
+    def clear(self):
+        for w in self.winfo_children():
+            w.destroy()
+
+    def build_start_screen(self):
+        self.clear()
+        frame = ttk.Frame(self, padding=30)
+        frame.pack(expand=True)
+
+        title = ttk.Label(frame, text='Скейтинг система', font=('Segoe UI', 24, 'bold'))
+        title.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+
+        for row, (label, var) in enumerate([
+            ('Количество танцев', self.dances_var),
+            ('Количество судей', self.judges_var),
+            ('Количество пар', self.couples_var),
+        ], start=1):
+            ttk.Label(frame, text=label, font=('Segoe UI', 12)).grid(row=row, column=0, sticky='e', padx=10, pady=8)
+            ttk.Spinbox(frame, from_=1, to=50, textvariable=var, width=8, font=('Segoe UI', 12)).grid(row=row, column=1, sticky='w', pady=8)
+
+        ttk.Button(frame, text='Создать таблицы', command=self.build_tables).grid(row=4, column=0, columnspan=2, pady=20)
+
+    def build_tables(self):
+        try:
+            self.dances = max(1, int(self.dances_var.get()))
+            self.judges = max(1, int(self.judges_var.get()))
+            self.couples = max(1, int(self.couples_var.get()))
+        except Exception:
+            messagebox.showerror('Ошибка', 'Введите корректные числа.')
+            return
+
+        self.clear()
+        top = ttk.Frame(self, padding=(12, 10))
+        top.pack(fill='x')
+        ttk.Button(top, text='← Настройки', command=self.build_start_screen).pack(side='left')
+        ttk.Button(top, text='Рассчитать места', command=self.calculate).pack(side='right')
+
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill='both', expand=True, padx=12, pady=8)
+        self.entries = []
+
+        for d in range(self.dances):
+            outer = ttk.Frame(self.notebook)
+            self.notebook.add(outer, text=f'Танец {d + 1}')
+
+            canvas = tk.Canvas(outer, bg='white')
+            scroll_x = ttk.Scrollbar(outer, orient='horizontal', command=canvas.xview)
+            scroll_y = ttk.Scrollbar(outer, orient='vertical', command=canvas.yview)
+            grid = ttk.Frame(canvas, padding=10)
+            grid_id = canvas.create_window((0, 0), window=grid, anchor='nw')
+            canvas.configure(xscrollcommand=scroll_x.set, yscrollcommand=scroll_y.set)
+            canvas.pack(side='left', fill='both', expand=True)
+            scroll_y.pack(side='right', fill='y')
+            scroll_x.pack(side='bottom', fill='x')
+
+            def on_configure(event, canvas=canvas):
+                canvas.configure(scrollregion=canvas.bbox('all'))
+            grid.bind('<Configure>', on_configure)
+
+            ttk.Label(grid, text='Пара', font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, padx=4, pady=4)
+            for j in range(self.judges):
+                ttk.Label(grid, text=f'Судья {j + 1}', font=('Segoe UI', 10, 'bold')).grid(row=0, column=j + 1, padx=4, pady=4)
+
+            dance_entries = []
+            for c in range(self.couples):
+                ttk.Label(grid, text=f'Пара {c + 1}', font=('Segoe UI', 10, 'bold')).grid(row=c + 1, column=0, padx=4, pady=4)
+                row_entries = []
+                for j in range(self.judges):
+                    e = ttk.Entry(grid, width=8, justify='center')
+                    e.grid(row=c + 1, column=j + 1, padx=4, pady=4)
+                    row_entries.append(e)
+                dance_entries.append(row_entries)
+            self.entries.append(dance_entries)
+
+        result_frame = ttk.LabelFrame(self, text='Результаты', padding=10)
+        result_frame.pack(fill='both', expand=False, padx=12, pady=(0, 12))
+        self.result_text = tk.Text(result_frame, height=10, wrap='word', font=('Consolas', 11))
+        self.result_text.pack(fill='both', expand=True)
+
+    def read_data(self):
+        full_data = []
+        for d in range(self.dances):
+            dance = []
+            for c in range(self.couples):
+                row = []
+                seen = set()
+                for j in range(self.judges):
+                    raw = self.entries[d][c][j].get().strip()
+                    if raw == '':
+                        row.append(self.couples)
+                        continue
+                    val = int(raw)
+                    if val < 1 or val > self.couples:
+                        raise ValueError(f'Танец {d + 1}, пара {c + 1}, судья {j + 1}: место должно быть от 1 до {self.couples}.')
+                    row.append(val)
+                dance.append(row)
+            # Проверка дублей у каждого судьи в каждом танце.
+            for j in range(self.judges):
+                vals = [dance[c][j] for c in range(self.couples)]
+                if len(vals) != len(set(vals)):
+                    raise ValueError(f'Танец {d + 1}, судья {j + 1}: есть повторяющиеся места.')
+            full_data.append(dance)
+        return full_data
+
+    def calculate(self):
+        try:
+            data = self.read_data()
+            places, sums, dance_places = final_places(data, self.couples, self.judges, self.dances)
+        except Exception as e:
+            messagebox.showerror('Ошибка ввода', str(e))
+            return
+
+        ordered = sorted(range(self.couples), key=lambda c: (places[c], c))
+        lines = []
+        lines.append('ИТОГОВЫЕ МЕСТА')
+        lines.append('-' * 60)
+        for c in ordered:
+            details = '; '.join(f'Т{d + 1}: {fmt_place(dance_places[d][c])}' for d in range(self.dances))
+            lines.append(f'{places[c]:>2} место — Пара {c + 1:<2} | сумма: {fmt_place(sums[c]):<5} | {details}')
+
+        lines.append('\nМЕСТА ПО ТАНЦАМ')
+        lines.append('-' * 60)
+        for d in range(self.dances):
+            lines.append(f'Танец {d + 1}: ' + ', '.join(f'Пара {c + 1}={fmt_place(dance_places[d][c])}' for c in range(self.couples)))
+
+        self.result_text.delete('1.0', 'end')
+        self.result_text.insert('1.0', '\n'.join(lines))
+
+
+if __name__ == '__main__':
+    app = SkatingApp()
+    app.mainloop()
+`;
+
+    function startPythonProgram() {
+      if (!saveSetupValues()) return;
+      consoleMetaDances.innerText = dances;
+      consoleMetaJudges.innerText = judges;
+      consoleMetaCouples.innerText = couples;
+      pythonCodePreview.textContent = getPythonCodePreview();
+      buildConsoleEmptyTemplate();
+      showScreen('consoleScreen');
+      setTimeout(() => consoleInput.focus(), 120);
+    }
+
+    function getPythonCodePreview() {
+      return `def places(rows, n, m):
+    need = m // 2 + 1
+    used = [False] * n
+    res = [None] * n
+    place = 1
+
+    def stat(pair, k):
+        marks = [x for x in rows[pair] if x <= k]
+        return len(marks), sum(marks)
+
+    while place <= n:
+        k0 = None
+        for k in range(1, n + 1):
+            ok = any(not used[p] and stat(p, k)[0] >= need for p in range(n))
+            if ok:
+                k0 = k
+                break
+
+        cand = [p for p in range(n) if not used[p] and stat(p, k0)[0] >= need]
+        cand.sort(key=lambda p: [(-stat(p, k)[0], stat(p, k)[1]) for k in range(k0, n + 1)])
+
+        i = 0
+        while i < len(cand):
+            key = [stat(cand[i], k) for k in range(k0, n + 1)]
+            group = [cand[i]]
+            i += 1
+            while i < len(cand) and [stat(cand[i], k) for k in range(k0, n + 1)] == key:
+                group.append(cand[i])
+                i += 1
+
+            value = place if len(group) == 1 else (place + place + len(group) - 1) / 2
+            for p in group:
+                res[p] = value
+                used[p] = True
+            place += len(group)
+
+    return res
+
+
+def final(dances, n, m):
+    dance_res = [places(d, n, m) for d in dances]
+    sums = [sum(d[p] for d in dance_res) for p in range(n)]
+    order = sorted(range(n), key=lambda p: (sums[p], p))
+    return order, sums, dance_res`;
+    }
+
+    function buildConsoleEmptyTemplate() {
+      const lines = [];
+      for (let d = 0; d < dances; d++) {
+        lines.push(`# Танец ${d + 1}`);
+        for (let c = 0; c < couples; c++) {
+          lines.push(`Пара ${c + 1}: `);
+        }
+        if (d < dances - 1) lines.push('');
+      }
+      consoleInput.value = lines.join('\n');
+      consoleOutput.classList.remove('error');
+      consoleOutput.textContent = 'Введите места и нажмите «Рассчитать места».';
+    }
+
+    function fillConsoleExample() {
+      const lines = [];
+      for (let d = 0; d < dances; d++) {
+        lines.push(`# Танец ${d + 1}`);
+        const baseRows = buildLatinSquareExample(couples, judges, d);
+        for (let c = 0; c < couples; c++) {
+          lines.push(`Пара ${c + 1}: ${baseRows[c].join(' ')}`);
+        }
+        if (d < dances - 1) lines.push('');
+      }
+      consoleInput.value = lines.join('\n');
+      consoleOutput.classList.remove('error');
+      consoleOutput.textContent = 'Пример заполнен. Можно нажать «Рассчитать места» или заменить числа своими.';
+    }
+
+    function buildLatinSquareExample(couplesCount, judgesCount, shift) {
+      return Array.from({ length: couplesCount }, (_, c) =>
+        Array.from({ length: judgesCount }, (_, j) => ((c + j + shift) % couplesCount) + 1)
+      );
+    }
+
+    function parseConsoleInput() {
+      const rows = [];
+      const rawLines = consoleInput.value.split(/\r?\n/);
+
+      for (const raw of rawLines) {
+        let line = raw.trim();
+        if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+        if (/^танец\s+\d+/i.test(line)) continue;
+        if (/^dance\s+\d+/i.test(line)) continue;
+
+        if (line.includes(':')) line = line.slice(line.indexOf(':') + 1).trim();
+        if (!line) continue;
+
+        const matches = line.match(/-?\d+(?:[.,]\d+)?/g);
+        if (!matches) continue;
+
+        const nums = matches.map(x => Number(x.replace(',', '.')));
+        rows.push(nums);
+      }
+
+      const expectedRows = dances * couples;
+      if (rows.length !== expectedRows) {
+        throw new Error(`Нужно ${expectedRows} строк с оценками: ${dances} танц. × ${couples} пар. Сейчас найдено строк: ${rows.length}.`);
+      }
+
+      const parsed = [];
+      let idx = 0;
+      for (let d = 0; d < dances; d++) {
+        const danceRows = [];
+        for (let c = 0; c < couples; c++) {
+          const nums = rows[idx++];
+          if (nums.length !== judges) {
+            throw new Error(`Танец ${d + 1}, пара ${c + 1}: нужно ${judges} чисел, а введено ${nums.length}.`);
+          }
+          const clean = nums.map((v, j) => {
+            if (!Number.isInteger(v) || v < 1 || v > couples) {
+              throw new Error(`Танец ${d + 1}, пара ${c + 1}, судья ${j + 1}: место должно быть целым числом от 1 до ${couples}.`);
+            }
+            return v;
+          });
+          danceRows.push(clean);
+        }
+        parsed.push(danceRows);
+      }
+
+      validateConsoleJudgePlaces(parsed);
+      return parsed;
+    }
+
+    function validateConsoleJudgePlaces(data) {
+      for (let d = 0; d < dances; d++) {
+        for (let j = 0; j < judges; j++) {
+          const places = [];
+          for (let c = 0; c < couples; c++) places.push(data[d][c][j]);
+          const unique = new Set(places);
+          if (unique.size !== couples) {
+            throw new Error(`Танец ${d + 1}, судья ${j + 1}: места не должны повторяться. Сейчас: ${places.join(' ')}.`);
+          }
+          for (let p = 1; p <= couples; p++) {
+            if (!unique.has(p)) {
+              throw new Error(`Танец ${d + 1}, судья ${j + 1}: отсутствует место ${p}.`);
+            }
+          }
+        }
+      }
+    }
+
+    function runConsoleCalculation() {
+      try {
+        allData = parseConsoleInput();
+        const result = calculateResultsData();
+        consoleOutput.classList.remove('error');
+        consoleOutput.textContent = formatConsoleResult(result);
+      } catch (err) {
+        consoleOutput.classList.add('error');
+        consoleOutput.textContent = `Ошибка ввода:
+${err.message}`;
+      }
+    }
+
+    function calculateResultsData() {
+      const dancePlaces = [];
+      for (let d = 0; d < dances; d++) {
+        dancePlaces.push(getDancePlaces(d));
+      }
+
+      const totalSums = Array(couples).fill(0);
+      for (let c = 0; c < couples; c++) {
+        for (let d = 0; d < dances; d++) totalSums[c] += dancePlaces[d][c];
+      }
+
+      const indices = Array.from({ length: couples }, (_, i) => i);
+      indices.sort((a, b) => {
+        if (totalSums[a] !== totalSums[b]) return totalSums[a] - totalSums[b];
+        return compareByRule10and11(a, b, dancePlaces, allData);
+      });
+
+      const finalPlaces = Array(couples).fill(0);
+      let currentRank = 1;
+      for (let i = 0; i < indices.length; i++) {
+        const curr = indices[i];
+        if (i > 0) {
+          const prev = indices[i - 1];
+          const sameSum = Math.abs(totalSums[prev] - totalSums[curr]) < 1e-6;
+          const cmp = sameSum ? compareByRule10and11(prev, curr, dancePlaces, allData) : 1;
+          finalPlaces[curr] = sameSum && cmp === 0 ? finalPlaces[prev] : currentRank;
+        } else {
+          finalPlaces[curr] = currentRank;
+        }
+        currentRank++;
+      }
+
+      return { dancePlaces, totalSums, finalPlaces };
+    }
+
+    function formatConsoleResult({ dancePlaces, totalSums, finalPlaces }) {
+      const ordered = Array.from({ length: couples }, (_, i) => i).sort((a, b) => {
+        if (finalPlaces[a] !== finalPlaces[b]) return finalPlaces[a] - finalPlaces[b];
+        return a - b;
+      });
+
+      const lines = [];
+      lines.push('ИТОГОВЫЕ МЕСТА');
+      lines.push('='.repeat(64));
+      for (const c of ordered) {
+        const danceText = dancePlaces.map((d, idx) => `Т${idx + 1}: ${formatPlace(d[c])}`).join('; ');
+        lines.push(`${String(finalPlaces[c]).padStart(2, ' ')} место — Пара ${String(c + 1).padEnd(2, ' ')} | сумма: ${formatPlace(totalSums[c]).padEnd(5, ' ')} | ${danceText}`);
+      }
+
+      lines.push('');
+      lines.push('МЕСТА ПО ТАНЦАМ');
+      lines.push('='.repeat(64));
+      for (let d = 0; d < dances; d++) {
+        const row = Array.from({ length: couples }, (_, c) => `Пара ${c + 1}=${formatPlace(dancePlaces[d][c])}`).join(', ');
+        lines.push(`Танец ${d + 1}: ${row}`);
+      }
+
+      return lines.join('\n');
+    }
+
+    let lastExcelDownloadUrl = null;
+
+    function startExcelTemplate() {
+      if (!saveSetupValues()) return;
+
+      if (lastExcelDownloadUrl) {
+        URL.revokeObjectURL(lastExcelDownloadUrl);
+        lastExcelDownloadUrl = null;
+      }
+
+      const xml = buildExcelXml();
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      lastExcelDownloadUrl = url;
+      const fileName = `skating_system_${dances}_dances_${judges}_judges_${couples}_couples.xls`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+
+      // В некоторых браузерах автоматический клик по ссылке на Blob может блокироваться.
+      // Поэтому ниже дополнительно показываем пользователю обычную видимую ссылку для скачивания.
+      try {
+        link.click();
+      } catch (error) {
+        console.warn('Автоматическое скачивание Excel заблокировано браузером:', error);
+      }
+
+      setTimeout(() => {
+        link.remove();
+      }, 1000);
+
+      platformNotice.innerHTML = `
+        <a class="download-link" href="${url}" download="${fileName}">Скачать Excel-файл</a>
+      `;
+      platformNotice.classList.add('show');
+    }
+
+    function startSiteCalculator() {
+      if (!saveSetupValues()) return;
+      createTables();
+      calculatorTitle.innerText = 'Скейтинг система';
+      modeCaption.innerText = 'Обычный расчёт на сайте по правилам скейтинга.';
+      showScreen('calculatorScreen');
+      setTimeout(() => inputElements?.[0]?.[0]?.[0]?.focus(), 120);
+    }
+
+    function createTables() {
+      currentDance = 0;
+
+      allData = Array.from({ length: dances }, () =>
+        Array.from({ length: couples }, () => Array(judges).fill(null))
+      );
+      inputElements = Array.from({ length: dances }, () =>
+        Array.from({ length: couples }, () => Array(judges).fill(null))
+      );
+
+      metaDances.innerText = dances;
+      metaJudges.innerText = judges;
+      metaCouples.innerText = couples;
+
+      renderDanceTabs();
+      renderTables();
+      finalResults.innerHTML = '<div class="hint">Введите оценки судей и нажмите «Рассчитать места».</div>';
+      calculationDetails.innerHTML = '';
+      infoStatus.innerText = '';
+      infoStatus.classList.remove('error');
+    }
+
+    function renderDanceTabs() {
+      danceTabs.innerHTML = '';
+      for (let d = 0; d < dances; d++) {
+        const tab = document.createElement('div');
+        tab.className = 'dance-btn' + (d === currentDance ? ' active' : '');
+        tab.innerText = `Танец ${d + 1}`;
+        tab.onclick = () => switchToDance(d);
+        danceTabs.appendChild(tab);
+      }
+    }
+
+    function renderTables() {
+      tablesArea.innerHTML = '';
+
+      for (let d = 0; d < dances; d++) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-container';
+        wrapper.style.display = d === currentDance ? 'block' : 'none';
+        wrapper.dataset.dance = d;
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+
+        const firstTh = document.createElement('th');
+        firstTh.innerText = 'Пара';
+        headRow.appendChild(firstTh);
+
+        for (let j = 0; j < judges; j++) {
+          const th = document.createElement('th');
+          th.innerText = `Судья ${j + 1}`;
+          headRow.appendChild(th);
+        }
+
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        for (let c = 0; c < couples; c++) {
+          const row = document.createElement('tr');
+
+          const label = document.createElement('td');
+          label.className = 'couple-label';
+          label.innerText = `Пара ${c + 1}`;
+          row.appendChild(label);
+
+          for (let j = 0; j < judges; j++) {
+            const td = document.createElement('td');
+            const input = document.createElement('input');
+            input.className = 'judge-input';
+            input.type = 'number';
+            input.min = '1';
+            input.max = String(couples);
+            input.inputMode = 'numeric';
+            input.dataset.dance = d;
+            input.dataset.couple = c;
+            input.dataset.judge = j;
+            input.value = allData[d][c][j] ?? '';
+
+            input.addEventListener('input', () => saveValue(d, c, j, input));
+            input.addEventListener('keydown', (e) => handleKeyNavigation(e, d, c, j));
+
+            inputElements[d][c][j] = input;
+            td.appendChild(input);
+            row.appendChild(td);
+          }
+
+          tbody.appendChild(row);
+        }
+
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        tablesArea.appendChild(wrapper);
+      }
+    }
+
+    function switchToDance(danceIdx) {
+      currentDance = danceIdx;
+      renderDanceTabs();
+      Array.from(tablesArea.children).forEach((el) => {
+        el.style.display = Number(el.dataset.dance) === currentDance ? 'block' : 'none';
+      });
+    }
+
+    function saveValue(dance, couple, judge, input) {
+      let val = parseInt(input.value, 10);
+
+      if (isNaN(val)) {
+        allData[dance][couple][judge] = null;
+        input.classList.remove('invalid');
+        validateJudgePlaces(dance, judge);
+        return;
+      }
+
+      val = Math.min(couples, Math.max(1, val));
+      input.value = val;
+      allData[dance][couple][judge] = val;
+
+      const hasDuplicates = validateJudgePlaces(dance, judge);
+      const typedEnough = couples < 10 || String(input.value).length >= String(couples).length;
+      if (!hasDuplicates && typedEnough) {
+        setTimeout(() => moveToNextCell(dance, couple, judge), 0);
+      }
+    }
+
+    function validateJudgePlaces(dance, judge) {
+      const counts = new Map();
+
+      for (let c = 0; c < couples; c++) {
+        const p = allData[dance][c][judge];
+        if (p !== null && p !== undefined) {
+          counts.set(p, (counts.get(p) || 0) + 1);
+        }
+      }
+
+      const duplicatePlaces = new Set(
+        Array.from(counts.entries())
+          .filter(([, count]) => count > 1)
+          .map(([place]) => place)
+      );
+      const hasDuplicates = duplicatePlaces.size > 0;
+
+      for (let c = 0; c < couples; c++) {
+        const cell = inputElements[dance][c][judge];
+        if (!cell) continue;
+
+        const p = allData[dance][c][judge];
+        if (duplicatePlaces.has(p)) cell.classList.add('invalid');
+        else cell.classList.remove('invalid');
+      }
+
+      if (hasDuplicates) {
+        infoStatus.innerText = `⚠️ Ошибка: танец ${dance + 1}, судья ${judge + 1} — место ${Array.from(duplicatePlaces).join(', ')} указано повторно`;
+        infoStatus.classList.add('error');
+      } else {
+        infoStatus.innerText = '';
+        infoStatus.classList.remove('error');
+      }
+
+      return hasDuplicates;
+    }
+
+    function handleKeyNavigation(e, dance, couple, judge) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      moveToNextCell(dance, couple, judge);
+    }
+
+    function moveToNextCell(dance, couple, judge) {
+      let nextDance = dance;
+      let nextJudge = judge;
+      let nextCouple = couple + 1;
+
+      if (nextCouple >= couples) {
+        nextCouple = 0;
+        nextJudge = judge + 1;
+
+        if (nextJudge >= judges) {
+          nextJudge = 0;
+          nextDance = dance + 1;
+
+          if (nextDance >= dances) {
+            calculateAndDisplayResults();
+            return;
+          }
+
+          switchToDance(nextDance);
+        }
+      }
+
+      const nextInput = inputElements[nextDance]?.[nextCouple]?.[nextJudge];
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+      }
+    }
+
+    // ------------------- ЯДРО ПРАВИЛ 5-11 -------------------------
+
+    function getMarksLessOrEqual(votes, threshold) {
+      return votes.filter(v => v <= threshold);
+    }
+
+    // Исправление: если на текущем месте одинаковые количество и сумма,
+    // сравниваем дальше по следующим местам, пока не найдется различие.
+    function compareVotesBySkating(votesA, votesB, fromPlace = 1) {
+      for (let k = fromPlace; k <= couples; k++) {
+        const marksA = getMarksLessOrEqual(votesA, k);
+        const marksB = getMarksLessOrEqual(votesB, k);
+
+        const cntA = marksA.length;
+        const cntB = marksB.length;
+
+        if (cntA !== cntB) return cntB - cntA; // больше голосов лучше
+
+        const sumA = marksA.reduce((s, v) => s + v, 0);
+        const sumB = marksB.reduce((s, v) => s + v, 0);
+
+        if (sumA !== sumB) return sumA - sumB; // меньшая сумма лучше
+      }
+
+      return 0;
+    }
+
+    function getDancePlaces(danceIdx) {
+      const nJudges = judges;
+      const nCouples = couples;
+      const couplePlaces = Array(nCouples).fill().map(() => Array(nJudges).fill(0));
+
+      for (let c = 0; c < nCouples; c++) {
+        for (let j = 0; j < nJudges; j++) {
+          let p = allData[danceIdx]?.[c]?.[j];
+          if (p === undefined || p === null || isNaN(p)) p = nCouples;
+          p = Math.min(nCouples, Math.max(1, p));
+          couplePlaces[c][j] = p;
+        }
+      }
+
+      const neededMajority = Math.floor(nJudges / 2) + 1;
+      const assigned = Array(nCouples).fill(false);
+      const result = Array(nCouples).fill(null);
+      let nextPlace = 1;
+
+      function statsFor(idx, threshold) {
+        const marks = getMarksLessOrEqual(couplePlaces[idx], threshold);
+        return {
+          count: marks.length,
+          sum: marks.reduce((a, b) => a + b, 0)
+        };
+      }
+
+      function compareCandidatesFromThreshold(a, b, startThreshold) {
+        for (let k = startThreshold; k <= nCouples; k++) {
+          const sa = statsFor(a.idx, k);
+          const sb = statsFor(b.idx, k);
+
+          // Правило 6: большее большинство лучше.
+          if (sa.count !== sb.count) return sb.count - sa.count;
+
+          // Правило 7а: при равном большинстве меньшая сумма составляющих лучше.
+          if (sa.sum !== sb.sum) return sa.sum - sb.sum;
+
+          // Правило 7б: если количество и сумма равны, сравниваем дальше.
+        }
+
+        // Правило 8: различий нет до последней колонки.
+        return 0;
+      }
+
+      function tieSignature(idx, startThreshold) {
+        const parts = [];
+        for (let k = startThreshold; k <= nCouples; k++) {
+          const s = statsFor(idx, k);
+          parts.push(`${s.count}:${s.sum}`);
+        }
+        return parts.join('|');
+      }
+
+      while (nextPlace <= nCouples) {
+        // Правило 5: колонки 1, 1-2, 1-3 и т.д. рассматриваются строго последовательно.
+        let threshold = null;
+        for (let k = 1; k <= nCouples; k++) {
+          const hasMajority = Array.from({ length: nCouples }, (_, i) => i)
+            .some(i => !assigned[i] && statsFor(i, k).count >= neededMajority);
+          if (hasMajority) {
+            threshold = k;
+            break;
+          }
+        }
+
+        if (threshold === null) {
+          // Теоретический запасной случай: большинство не найдено ни в одной колонке.
+          const remaining = [];
+          for (let i = 0; i < nCouples; i++) if (!assigned[i]) remaining.push(i);
+          const avgPlace = (nextPlace + (nextPlace + remaining.length - 1)) / 2;
+          for (const i of remaining) result[i] = avgPlace;
+          break;
+        }
+
+        const candidates = [];
+        for (let i = 0; i < nCouples; i++) {
+          if (assigned[i]) continue;
+          const st = statsFor(i, threshold);
+          if (st.count >= neededMajority) {
+            candidates.push({ idx: i, threshold, count: st.count, sum: st.sum });
+          }
+        }
+
+        candidates.sort((a, b) => compareCandidatesFromThreshold(a, b, threshold));
+
+        // Разбиваем кандидатов на группы. Если внутри группы до конца колонок нет различий,
+        // всем парам этой группы даётся среднее арифметическое оспариваемых мест.
+        let pos = 0;
+        while (pos < candidates.length) {
+          const group = [candidates[pos]];
+          const sig = tieSignature(candidates[pos].idx, threshold);
+          let q = pos + 1;
+
+          while (q < candidates.length && tieSignature(candidates[q].idx, threshold) === sig) {
+            group.push(candidates[q]);
+            q++;
+          }
+
+          if (group.length === 1) {
+            result[group[0].idx] = nextPlace;
+          } else {
+            const avgPlace = (nextPlace + (nextPlace + group.length - 1)) / 2;
+            for (const item of group) result[item.idx] = avgPlace;
+          }
+
+          for (const item of group) assigned[item.idx] = true;
+          nextPlace += group.length;
+          pos = q;
+        }
+      }
+
+      return result;
+    }
+
+    function compareByRule10and11(a, b, dancePlacesMatrix, fullJudgeData) {
+      const placesA = dancePlacesMatrix.map(d => d[a]);
+      const placesB = dancePlacesMatrix.map(d => d[b]);
+
+      for (let k = 1; k <= couples; k++) {
+        const marksA = placesA.filter(p => p <= k);
+        const marksB = placesB.filter(p => p <= k);
+
+        const cntA = marksA.length;
+        const cntB = marksB.length;
+
+        if (cntA !== cntB) return cntA > cntB ? -1 : 1;
+
+        if (cntA > 0) {
+          const sumA = marksA.reduce((s, v) => s + v, 0);
+          const sumB = marksB.reduce((s, v) => s + v, 0);
+          if (sumA !== sumB) return sumA < sumB ? -1 : 1;
+        }
+      }
+
+      // Правило 11: большой скейтинг по всем судейским оценкам во всех танцах.
+      const totalCells = judges * dances;
+      const neededMajority = Math.floor(totalCells / 2) + 1;
+      let votesA = [];
+      let votesB = [];
+
+      for (let d = 0; d < dances; d++) {
+        for (let j = 0; j < judges; j++) {
+          let pa = fullJudgeData[d]?.[a]?.[j];
+          let pb = fullJudgeData[d]?.[b]?.[j];
+
+          if (pa === undefined || pa === null || isNaN(pa)) pa = couples;
+          if (pb === undefined || pb === null || isNaN(pb)) pb = couples;
+
+          votesA.push(pa);
+          votesB.push(pb);
+        }
+      }
+
+      for (let thr = 1; thr <= couples; thr++) {
+        const marksA = votesA.filter(v => v <= thr);
+        const marksB = votesB.filter(v => v <= thr);
+
+        const cntA = marksA.length;
+        const cntB = marksB.length;
+
+        if (cntA !== cntB) return cntA > cntB ? -1 : 1;
+
+        if (cntA >= neededMajority) {
+          const sumA = marksA.reduce((s, x) => s + x, 0);
+          const sumB = marksB.reduce((s, x) => s + x, 0);
+          if (sumA !== sumB) return sumA < sumB ? -1 : 1;
+        }
+      }
+
+      return 0;
+    }
+
+    function calculateAndDisplayResults() {
+      const dancePlaces = [];
+      for (let d = 0; d < dances; d++) {
+        dancePlaces.push(getDancePlaces(d));
+      }
+
+      const totalSums = Array(couples).fill(0);
+      for (let c = 0; c < couples; c++) {
+        let sum = 0;
+        for (let d = 0; d < dances; d++) {
+          sum += dancePlaces[d][c];
+        }
+        totalSums[c] = sum;
+      }
+
+      const indices = Array.from({ length: couples }, (_, i) => i);
+
+      indices.sort((a, b) => {
+        if (totalSums[a] !== totalSums[b]) return totalSums[a] - totalSums[b];
+        return compareByRule10and11(a, b, dancePlaces, allData);
+      });
+
+      const finalPlaces = Array(couples).fill(0);
+      let currentRank = 1;
+
+      for (let i = 0; i < indices.length; i++) {
+        const curr = indices[i];
+
+        if (i > 0) {
+          const prev = indices[i - 1];
+          const sameSum = Math.abs(totalSums[prev] - totalSums[curr]) < 1e-6;
+          const cmp = sameSum ? compareByRule10and11(prev, curr, dancePlaces, allData) : 1;
+
+          if (sameSum && cmp === 0) {
+            finalPlaces[curr] = finalPlaces[prev];
+          } else {
+            finalPlaces[curr] = currentRank;
+          }
+        } else {
+          finalPlaces[curr] = currentRank;
+        }
+
+        currentRank++;
+      }
+
+      renderFinalResults(finalPlaces, totalSums, dancePlaces);
+    }
+
+    function renderFinalResults(finalPlaces, totalSums, dancePlaces) {
+      finalResults.innerHTML = '';
+
+      const ordered = Array.from({ length: couples }, (_, i) => i).sort((a, b) => {
+        if (finalPlaces[a] !== finalPlaces[b]) return finalPlaces[a] - finalPlaces[b];
+        return a - b;
+      });
+
+      for (const c of ordered) {
+        const row = document.createElement('div');
+        row.className = 'final-row';
+
+        const place = document.createElement('div');
+        place.className = 'final-place-num';
+        place.innerText = `${finalPlaces[c]} место`;
+
+        const label = document.createElement('div');
+        const danceText = dancePlaces.map((d, idx) => `Т${idx + 1}: ${formatPlace(d[c])}`).join('; ');
+        label.innerText = `Пара ${c + 1} — сумма мест: ${formatPlace(totalSums[c])}${dances > 1 ? ` (${danceText})` : ''}`;
+
+        row.appendChild(place);
+        row.appendChild(label);
+        finalResults.appendChild(row);
+      }
+
+      renderCalculationDetails(ordered, finalPlaces, totalSums, dancePlaces);
+    }
+
+    function renderCalculationDetails(ordered, finalPlaces, totalSums, dancePlaces) {
+      calculationDetails.innerHTML = '';
+
+      for (let d = 0; d < dances; d++) {
+        renderDanceCalculationTable(d, dancePlaces[d]);
+      }
+
+      if (dances > 1) {
+        renderOverallCalculationTable(ordered, finalPlaces, totalSums, dancePlaces);
+      }
+    }
+
+    function renderDanceCalculationTable(danceIdx, danceResultPlaces) {
+      const nJudges = judges;
+      const nCouples = couples;
+      const neededMajority = Math.floor(nJudges / 2) + 1;
+
+      const title = document.createElement('div');
+      title.className = 'dance-calc-title';
+      title.innerText = `Танец ${danceIdx + 1}`;
+      calculationDetails.appendChild(title);
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+
+      const headers = [
+        'Пара',
+        'Оценки',
+        ...Array.from({ length: nCouples }, (_, i) => i === 0 ? '1' : `1-${i + 1}`),
+        'Место'
+      ];
+
+      headers.forEach(text => {
+        const th = document.createElement('th');
+        th.innerText = text;
+        headRow.appendChild(th);
+      });
+
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      for (let c = 0; c < nCouples; c++) {
+        const tr = document.createElement('tr');
+        const votes = [];
+
+        for (let j = 0; j < nJudges; j++) {
+          let p = allData[danceIdx]?.[c]?.[j];
+          if (p === undefined || p === null || isNaN(p)) p = nCouples;
+          p = Math.min(nCouples, Math.max(1, p));
+          votes.push(p);
+        }
+
+        const pairTd = document.createElement('td');
+        pairTd.innerText = c + 1;
+        tr.appendChild(pairTd);
+
+        const votesTd = document.createElement('td');
+        votesTd.innerText = votes.join(' ');
+        tr.appendChild(votesTd);
+
+        for (let k = 1; k <= nCouples; k++) {
+          const marks = votes.filter(v => v <= k);
+          const cnt = marks.length;
+          const sum = marks.reduce((a, b) => a + b, 0);
+          const td = document.createElement('td');
+
+          if (cnt === 0) {
+            td.innerText = '-';
+          } else if (k === 1) {
+            td.innerText = String(cnt);
+          } else {
+            td.innerText = `${cnt}(${sum})`;
+          }
+
+          tr.appendChild(td);
+        }
+
+        const placeTd = document.createElement('td');
+        placeTd.className = 'final-place-cell';
+        placeTd.innerText = formatPlace(danceResultPlaces[c]);
+        tr.appendChild(placeTd);
+
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      calculationDetails.appendChild(table);
+
+      const note = document.createElement('div');
+      note.className = 'majority-note';
+      note.innerText = `Необходимое большинство: ${neededMajority} из ${nJudges}`;
+      calculationDetails.appendChild(note);
+    }
+
+    function renderOverallCalculationTable(ordered, finalPlaces, totalSums, dancePlaces) {
+      const title = document.createElement('div');
+      title.className = 'dance-calc-title';
+      title.innerText = 'Итог по всем танцам';
+      calculationDetails.appendChild(title);
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+
+      ['Пара', ...Array.from({ length: dances }, (_, i) => `Танец ${i + 1}`), 'Сумма', 'Итоговое место'].forEach(text => {
+        const th = document.createElement('th');
+        th.innerText = text;
+        headRow.appendChild(th);
+      });
+
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      for (const c of ordered) {
+        const tr = document.createElement('tr');
+        const values = [
+          c + 1,
+          ...dancePlaces.map(d => formatPlace(d[c])),
+          formatPlace(totalSums[c]),
+          formatPlace(finalPlaces[c])
+        ];
+
+        values.forEach((text, idx) => {
+          const td = document.createElement('td');
+          if (idx === values.length - 1) td.className = 'final-place-cell';
+          td.innerText = text;
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      calculationDetails.appendChild(table);
+    }
+
+    function formatPlace(value) {
+      return Number.isInteger(value) ? String(value) : value.toFixed(2).replace('.', ',');
+    }
+
+    createTables();
+
+  </script>
+</body>
+</html>
